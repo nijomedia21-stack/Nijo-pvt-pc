@@ -1,0 +1,7 @@
+{
+  "name": "NIJO PVT PC",
+  "description": "Windows 11 personal workspace and cross-device transfer hub for Nijo with dual Polytechnic AI & ML and Libra Design Studio modes, Kerala Panchangam, and AI Copilot.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
