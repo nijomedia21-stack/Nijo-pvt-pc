@@ -142,9 +142,21 @@ export default function App() {
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
   };
 
-  // Calendar Event Handler
+  const handleUpdateTask = (updatedTask: Task) => {
+    setTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)));
+  };
+
+  // Calendar Event Handlers
   const handleAddCalendarEvent = (newEvent: CalendarEvent) => {
     setCalendarEvents((prev) => [...prev, newEvent]);
+  };
+
+  const handleUpdateCalendarEvent = (updatedEvent: CalendarEvent) => {
+    setCalendarEvents((prev) => prev.map((e) => (e.id === updatedEvent.id ? updatedEvent : e)));
+  };
+
+  const handleDeleteCalendarEvent = (eventId: string) => {
+    setCalendarEvents((prev) => prev.filter((e) => e.id !== eventId));
   };
 
   // Transfer Handlers
@@ -203,6 +215,7 @@ export default function App() {
               tasks={tasks}
               onToggleTask={handleToggleTask}
               onAddTask={handleAddTask}
+              onUpdateTask={handleUpdateTask}
               onDeleteTask={handleDeleteTask}
               currentWorkspace={workspaceMode}
             />
@@ -212,6 +225,8 @@ export default function App() {
             <CalendarModule
               events={calendarEvents}
               onAddEvent={handleAddCalendarEvent}
+              onUpdateEvent={handleUpdateCalendarEvent}
+              onDeleteEvent={handleDeleteCalendarEvent}
               selectedDateStr={selectedDateStr}
               onSelectDate={setSelectedDateStr}
             />

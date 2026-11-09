@@ -12,7 +12,9 @@ import {
   Calendar as CalendarIcon,
   Star,
   ArrowRight,
-  CornerDownLeft
+  CornerDownLeft,
+  Edit2,
+  Trash2
 } from 'lucide-react';
 import { CalendarEvent } from '../types';
 import { 
@@ -25,6 +27,8 @@ import {
 interface CalendarModuleProps {
   events: CalendarEvent[];
   onAddEvent: (newEvent: CalendarEvent) => void;
+  onUpdateEvent?: (updatedEvent: CalendarEvent) => void;
+  onDeleteEvent?: (eventId: string) => void;
   selectedDateStr: string;
   onSelectDate: (dateStr: string) => void;
 }
@@ -32,6 +36,8 @@ interface CalendarModuleProps {
 export const CalendarModule: React.FC<CalendarModuleProps> = ({
   events,
   onAddEvent,
+  onUpdateEvent,
+  onDeleteEvent,
   selectedDateStr,
   onSelectDate,
 }) => {
@@ -60,6 +66,40 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
   const [eventTime, setEventTime] = useState<string>('10:00');
   const [eventType, setEventType] = useState<CalendarEvent['type']>('reels');
   const [eventNotes, setEventNotes] = useState<string>('');
+
+  // Universal Edit Event State (User: എന്ത് കാര്യങ്ങൾ ഉണ്ടെങ്കിലും എഡിറ്റ് ചെയ്യാനും ഡിലീറ്റ് ചെയ്യാനും സാധിക്കണം)
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+  const [editEventTitle, setEditEventTitle] = useState<string>('');
+  const [editEventDate, setEditEventDate] = useState<string>('');
+  const [editEventTime, setEditEventTime] = useState<string>('10:00');
+  const [editEventType, setEditEventType] = useState<CalendarEvent['type']>('reels');
+  const [editEventNotes, setEditEventNotes] = useState<string>('');
+
+  const handleOpenEditEvent = (ev: CalendarEvent) => {
+    setEditingEvent(ev);
+    setEditEventTitle(ev.title);
+    setEditEventDate(ev.date);
+    setEditEventTime(ev.time);
+    setEditEventType(ev.type);
+    setEditEventNotes(ev.notes || '');
+  };
+
+  const handleSaveEventEdits = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingEvent || !editEventTitle.trim()) return;
+
+    if (onUpdateEvent) {
+      onUpdateEvent({
+        ...editingEvent,
+        title: editEventTitle.trim(),
+        date: editEventDate,
+        time: editEventTime,
+        type: editEventType,
+        notes: editEventNotes.trim() || undefined,
+      });
+    }
+    setEditingEvent(null);
+  };
 
   // Minimal Single-Icon Date Jump Popover State
   // User feedback: "അല്ലാണ്ട് വേറെ ഡബിൾ ഐക്കൺ ഒന്നും വേണ്ട. ഒറ്റ ഐക്കൺ. ജസ്റ്റ് 7/12/2026 എന്ന് പറഞ്ഞിട്ട് ഗോ എന്നാക്കുക. അല്ലെങ്കിൽ ഒരു എന്റർ ബട്ടൺ പോലത്തെ ഒരു സാധനം വെച്ചാൽ മതി. വേറെ ഒന്നും ഹെഡിങ്ങും വേണ്ട."
@@ -636,9 +676,25 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
                           <h5 className="font-bold text-slate-900 text-xs leading-snug">
                             {ev.title}
                           </h5>
-                          <span className="font-mono text-[10px] font-bold text-[#1E3A8A] bg-blue-50 px-2 py-0.5 rounded border border-blue-200 shrink-0">
-                            {ev.time}
-                          </span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="font-mono text-[10px] font-bold text-[#1E3A8A] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                              {ev.time}
+                            </span>
+                            <button
+                              onClick={() => handleOpenEditEvent(ev)}
+                              className="text-slate-400 hover:text-[#1E3A8A] p-1 rounded hover:bg-blue-50 transition-colors cursor-pointer"
+                              title="Edit Event (ഇവന്റ് എഡിറ്റ് ചെയ്യുക)"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => onDeleteEvent && onDeleteEvent(ev.id)}
+                              className="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 transition-colors cursor-pointer"
+                              title="Delete Event (ഇവന്റ് ഡിലീറ്റ് ചെയ്യുക)"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
                         </div>
 
                         {ev.notes && (
@@ -772,6 +828,132 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
                 >
                   Save Schedule
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Edit Event Modal (Universal Edit & Delete Requirement) */}
+      {editingEvent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div 
+            className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-[#0F294A] text-white p-4 flex items-center justify-between border-b border-[#1E3A8A]">
+              <div className="flex items-center gap-2">
+                <Edit2 className="w-4 h-4 text-cyan-300" />
+                <h3 className="text-xs font-bold text-white tracking-wide">
+                  Edit Event (ഇവന്റ് എഡിറ്റ് ചെയ്യുക)
+                </h3>
+              </div>
+              <button
+                onClick={() => setEditingEvent(null)}
+                className="text-slate-300 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEventEdits} className="p-5 space-y-3.5 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Event Title *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editEventTitle}
+                  onChange={(e) => setEditEventTitle(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    value={editEventDate}
+                    onChange={(e) => setEditEventDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Time
+                  </label>
+                  <input
+                    type="time"
+                    value={editEventTime}
+                    onChange={(e) => setEditEventTime(e.target.value)}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-slate-900"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Category Type
+                </label>
+                <select
+                  value={editEventType}
+                  onChange={(e) => setEditEventType(e.target.value as any)}
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-slate-900 bg-white"
+                >
+                  <option value="exam">Polytechnic Board Exam / Study</option>
+                  <option value="reels">Instagram Reel Release</option>
+                  <option value="deadline">Client Deliverable</option>
+                  <option value="festival">Public Holiday / Observance</option>
+                  <option value="class">Class / Meeting</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Notes
+                </label>
+                <textarea
+                  rows={2}
+                  value={editEventNotes}
+                  onChange={(e) => setEditEventNotes(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onDeleteEvent && editingEvent) {
+                      onDeleteEvent(editingEvent.id);
+                    }
+                    setEditingEvent(null);
+                  }}
+                  className="px-3.5 py-1.5 text-rose-600 hover:bg-rose-50 rounded-lg font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete Event</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingEvent(null)}
+                    className="px-3.5 py-1.5 text-slate-600 hover:bg-slate-100 rounded-lg font-medium cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-1.5 bg-[#0F294A] hover:bg-[#1E3A8A] text-white font-bold rounded-lg shadow-sm cursor-pointer"
+                  >
+                    Save Changes
+                  </button>
+                </div>
               </div>
             </form>
           </div>

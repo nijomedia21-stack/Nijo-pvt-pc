@@ -26,10 +26,14 @@ import {
   ToggleRight,
   RefreshCw,
   X,
-  QrCode
+  QrCode,
+  Play,
+  Pause,
+  Headphones
 } from 'lucide-react';
 import { ConnectedDevice, TransferHistoryItem } from '../types';
 import { generateQrMatrix } from '../utils/qrCodeHelper';
+import { voiceAudioEngine } from '../utils/audioPlayerHelper';
 
 export interface IncomingFileItem {
   id: string;
@@ -78,6 +82,7 @@ export const FilesModule: React.FC<FilesModuleProps> = ({
   const [dynamicToken, setDynamicToken] = useState<string>('TOKEN-8465-2820');
   const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
   const [qrCopied, setQrCopied] = useState<boolean>(false);
+  const [playingAudioFileId, setPlayingAudioFileId] = useState<string | null>(null);
 
   // Auto-Save to Laptop (default OFF as per user specification)
   const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(false);
@@ -803,6 +808,40 @@ export const FilesModule: React.FC<FilesModuleProps> = ({
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
+                      {/(m4a|mp3|wav|ogg)$/i.test(file.name) && (
+                        <button
+                          onClick={() => {
+                            if (playingAudioFileId === file.id) {
+                              voiceAudioEngine.stop();
+                              setPlayingAudioFileId(null);
+                            } else {
+                              setPlayingAudioFileId(file.id);
+                              voiceAudioEngine.playSynthesizedVoiceMemo(12, () => {}, () => {
+                                setPlayingAudioFileId(null);
+                              });
+                            }
+                          }}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+                            playingAudioFileId === file.id
+                              ? 'bg-[#1E3A8A] text-cyan-200 border-[#1E3A8A]'
+                              : 'bg-blue-50 text-[#0F294A] border-blue-200 hover:bg-blue-100'
+                          }`}
+                          title="Preview Voice Audio (വോയിസ് കേൾക്കാൻ ക്ലിക്ക് ചെയ്യുക)"
+                        >
+                          {playingAudioFileId === file.id ? (
+                            <>
+                              <Pause className="w-3.5 h-3.5" />
+                              <span>Playing...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Play className="w-3.5 h-3.5 fill-current" />
+                              <span>Preview Audio</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+
                       <button
                         onClick={() => handleDownloadFile(file)}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0F294A] hover:bg-[#1E3A8A] text-white text-xs font-semibold rounded-lg shadow-2xs transition-colors cursor-pointer"
