@@ -1,0 +1,16 @@
+{
+  "name": "NIJO SMM PC — Studio & File Hub",
+  "short_name": "NIJO SMM",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0F294A",
+  "theme_color": "#0F294A",
+  "description": "Windows 11 desktop workspace and local Wi-Fi file transfer hub for NIJO SMM and Polytechnic AI & ML",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}

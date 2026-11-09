@@ -25,7 +25,6 @@ interface SettingsModalProps {
   onUpdateSecurityPin: (newPin: string) => void;
   devices: ConnectedDevice[];
   onSignOut: () => void;
-  onOpenExportExe?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -35,7 +34,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onUpdateSecurityPin,
   devices,
   onSignOut,
-  onOpenExportExe,
 }) => {
   const [pinInput, setPinInput] = useState<string>(securityPin);
   const [pinSuccessMsg, setPinSuccessMsg] = useState<string | null>(null);
@@ -213,30 +211,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               ))}
             </div>
           </div>
-
-          {/* NIJO PVT PC .exe Export Option */}
-          {onOpenExportExe && (
-            <div className="p-3 bg-cyan-50/80 rounded-xl border border-cyan-200 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[#0F294A] text-cyan-300 flex items-center justify-center shrink-0">
-                  <Download className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-900">Convert to "NIJO PVT PC .exe"</p>
-                  <p className="text-[11px] text-slate-600">Export native Windows 11 executable builder & launcher</p>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  onClose();
-                  onOpenExportExe();
-                }}
-                className="px-3 py-1.5 bg-[#0F294A] hover:bg-[#1E3A8A] text-white text-xs font-bold rounded-lg cursor-pointer transition-colors shrink-0"
-              >
-                Get .exe
-              </button>
-            </div>
-          )}
 
           {/* App Build Version & Compliance */}
           <div className="p-3 bg-white rounded-xl border border-slate-200 text-[11px] text-slate-500 space-y-1">

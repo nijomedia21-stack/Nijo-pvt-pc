@@ -22,7 +22,7 @@ import { AdaptiveStudyDesignModule } from './components/AdaptiveStudyDesignModul
 import { CopilotWidget } from './components/CopilotWidget';
 import { SettingsModal } from './components/SettingsModal';
 import { LockScreen } from './components/LockScreen';
-import { ExportExeModal } from './components/ExportExeModal';
+import { DailySummaryModal } from './components/DailySummaryModal';
 
 export default function App() {
   // Authentication & Lock State
@@ -43,7 +43,7 @@ export default function App() {
   const [isWorkspaceSwitcherOpen, setIsWorkspaceSwitcherOpen] = useState<boolean>(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
-  const [isExportExeOpen, setIsExportExeOpen] = useState<boolean>(false);
+  const [isDailySummaryOpen, setIsDailySummaryOpen] = useState<boolean>(false);
 
   // Core Data
   const [tasks, setTasks] = useState<Task[]>(() => {
@@ -178,7 +178,6 @@ export default function App() {
         isCopilotOpen={isCopilotOpen}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onLockApp={() => setIsLocked(true)}
-        onOpenExportExe={() => setIsExportExeOpen(true)}
         panchangam={currentPanchangam}
       />
 
@@ -193,7 +192,7 @@ export default function App() {
           pendingTasksCount={pendingTasksCount}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onLockApp={() => setIsLocked(true)}
-          onOpenExportExe={() => setIsExportExeOpen(true)}
+          onOpenDailySummary={() => setIsDailySummaryOpen(true)}
           securityPin={securityPin}
         />
 
@@ -247,6 +246,16 @@ export default function App() {
         </main>
       </div>
 
+      {/* Daily Summary Modal Snapshot */}
+      <DailySummaryModal
+        isOpen={isDailySummaryOpen}
+        onClose={() => setIsDailySummaryOpen(false)}
+        tasks={tasks}
+        events={calendarEvents}
+        workspaceMode={workspaceMode}
+        panchangam={currentPanchangam}
+      />
+
       {/* Instagram-Style Dual Workspace Profile Switcher Modal */}
       <WorkspaceSwitcherModal
         isOpen={isWorkspaceSwitcherOpen}
@@ -263,13 +272,6 @@ export default function App() {
         onUpdateSecurityPin={(newPin) => setSecurityPin(newPin)}
         devices={devices}
         onSignOut={() => setIsLocked(true)}
-        onOpenExportExe={() => setIsExportExeOpen(true)}
-      />
-
-      {/* Convert into NIJO PVT PC .exe Modal Dialog */}
-      <ExportExeModal
-        isOpen={isExportExeOpen}
-        onClose={() => setIsExportExeOpen(false)}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Briefcase, 
   Palette, 
@@ -10,6 +10,8 @@ import {
   Sparkles, 
   Clock, 
   Plus, 
+  Trash2,
+  Edit2,
   ExternalLink,
   ChevronRight,
   Zap,
@@ -17,7 +19,8 @@ import {
   Eye,
   CheckCircle2,
   Share2,
-  FolderOpen
+  FolderOpen,
+  X
 } from 'lucide-react';
 import { WorkspaceMode, LibraBrandColor, InstagramReelItem } from '../types';
 import { 
@@ -31,7 +34,7 @@ interface AdaptiveStudyDesignModuleProps {
   onOpenWorkspaceSwitcher: () => void;
 }
 
-interface ClientProfile {
+export interface ClientProfile {
   id: string;
   name: string;
   handle: string;
@@ -43,31 +46,68 @@ interface ClientProfile {
   files: Array<{ name: string; size: string; type: string; date: string }>;
 }
 
-export const AdaptiveStudyDesignModule: React.FC<AdaptiveStudyDesignModuleProps> = () => {
-  // Clients state (Nijo SMM agency management)
-  const [clients, setClients] = useState<ClientProfile[]>([
-    {
-      id: 'c-libra',
-      name: 'Libra Studio',
-      handle: '@libra.studio',
-      niche: 'Luxury Minimalist Fashion & Visual Identity',
-      contractStatus: 'active',
-      postsScheduled: 4,
-      engagementRate: '4.8%',
-      storiesActive: 2,
-      files: [
-        { name: 'Libra_Brand_Identity_Kit_v2.svg', size: '1.2 MB', type: 'vector', date: 'Nov 02, 2026' },
-        { name: 'Reels_Hook_Batch_04.mp4', size: '18.4 MB', type: 'video', date: 'Nov 03, 2026' },
-        { name: 'Libra_Typography_Syne_Jakarta.pdf', size: '3.1 MB', type: 'pdf', date: 'Nov 01, 2026' },
-        { name: 'Client_Retainer_Agreement_2026.pdf', size: '850 KB', type: 'document', date: 'Oct 28, 2026' }
-      ]
-    }
-  ]);
+const DEFAULT_CLIENTS: ClientProfile[] = [
+  {
+    id: 'c-libra',
+    name: 'Libra Studio',
+    handle: '@libra.studio',
+    niche: 'Luxury Minimalist Fashion & Visual Identity',
+    contractStatus: 'active',
+    postsScheduled: 4,
+    engagementRate: '4.8%',
+    storiesActive: 2,
+    files: [
+      { name: 'Libra_Brand_Identity_Kit_v2.svg', size: '1.2 MB', type: 'vector', date: 'Nov 02, 2026' },
+      { name: 'Reels_Hook_Batch_04.mp4', size: '18.4 MB', type: 'video', date: 'Nov 03, 2026' },
+      { name: 'Libra_Typography_Syne_Jakarta.pdf', size: '3.1 MB', type: 'pdf', date: 'Nov 01, 2026' },
+      { name: 'Client_Retainer_Agreement_2026.pdf', size: '850 KB', type: 'document', date: 'Oct 28, 2026' }
+    ]
+  }
+];
 
-  const [selectedClientId, setSelectedClientId] = useState<string>('c-libra');
+export const AdaptiveStudyDesignModule: React.FC<AdaptiveStudyDesignModuleProps> = () => {
+  // Clients state with persistent localStorage
+  const [clients, setClients] = useState<ClientProfile[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('nijo_smm_clients');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch (e) {
+          // ignore error
+        }
+      }
+    }
+    return DEFAULT_CLIENTS;
+  });
+
+  const [selectedClientId, setSelectedClientId] = useState<string>(() => {
+    return clients[0]?.id || 'c-libra';
+  });
+
+  // Client to Delete & Client to Edit
+  const [clientToDelete, setClientToDelete] = useState<ClientProfile | null>(null);
+  const [clientToEdit, setClientToEdit] = useState<ClientProfile | null>(null);
+
+  // Edit form state
+  const [editName, setEditName] = useState<string>('');
+  const [editHandle, setEditHandle] = useState<string>('');
+  const [editNiche, setEditNiche] = useState<string>('');
+  const [editStatus, setEditStatus] = useState<'active' | 'review' | 'completed'>('active');
+  const [editEngagement, setEditEngagement] = useState<string>('4.8%');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('nijo_smm_clients', JSON.stringify(clients));
+      // sync client names to tasks module
+      const clientNames = clients.map(c => c.name.replace(/\s+Studio$/i, '').trim());
+      localStorage.setItem('nijo_pvt_clients', JSON.stringify(clientNames));
+    }
+  }, [clients]);
+
   const [copiedColorHex, setCopiedColorHex] = useState<string | null>(null);
   const [copiedCaptionId, setCopiedCaptionId] = useState<string | null>(null);
-  const [copiedPromptId, setCopiedPromptId] = useState<string | null>(null);
   const [captionGeneratorTopic, setCaptionGeneratorTopic] = useState<string>('');
   const [generatedCaption, setGeneratedCaption] = useState<string | null>(null);
 
@@ -79,7 +119,7 @@ export const AdaptiveStudyDesignModule: React.FC<AdaptiveStudyDesignModuleProps>
 
   const activeClient = clients.find(c => c.id === selectedClientId) || clients[0];
 
-  const handleCopy = (text: string, type: 'color' | 'caption' | 'prompt', id: string) => {
+  const handleCopy = (text: string, type: 'color' | 'caption', id: string) => {
     navigator.clipboard.writeText(text);
     if (type === 'color') {
       setCopiedColorHex(id);
@@ -87,9 +127,6 @@ export const AdaptiveStudyDesignModule: React.FC<AdaptiveStudyDesignModuleProps>
     } else if (type === 'caption') {
       setCopiedCaptionId(id);
       setTimeout(() => setCopiedCaptionId(null), 2500);
-    } else if (type === 'prompt') {
-      setCopiedPromptId(id);
-      setTimeout(() => setCopiedPromptId(null), 2500);
     }
   };
 
@@ -119,6 +156,62 @@ export const AdaptiveStudyDesignModule: React.FC<AdaptiveStudyDesignModuleProps>
     setIsAddClientModalOpen(false);
   };
 
+  const handleOpenEditClient = (client: ClientProfile) => {
+    setClientToEdit(client);
+    setEditName(client.name);
+    setEditHandle(client.handle);
+    setEditNiche(client.niche);
+    setEditStatus(client.contractStatus);
+    setEditEngagement(client.engagementRate);
+  };
+
+  const handleSaveEditClient = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clientToEdit || !editName.trim()) return;
+
+    setClients(prev => prev.map(c => {
+      if (c.id === clientToEdit.id) {
+        return {
+          ...c,
+          name: editName.trim(),
+          handle: editHandle.trim() || c.handle,
+          niche: editNiche.trim() || c.niche,
+          contractStatus: editStatus,
+          engagementRate: editEngagement.trim() || c.engagementRate,
+        };
+      }
+      return c;
+    }));
+
+    setClientToEdit(null);
+  };
+
+  const handleConfirmDeleteClient = (clientId: string) => {
+    const updated = clients.filter(c => c.id !== clientId);
+    if (updated.length === 0) {
+      setClients(DEFAULT_CLIENTS);
+      setSelectedClientId(DEFAULT_CLIENTS[0].id);
+    } else {
+      setClients(updated);
+      if (selectedClientId === clientId) {
+        setSelectedClientId(updated[0].id);
+      }
+    }
+    setClientToDelete(null);
+  };
+
+  const handleDeleteClientFile = (clientId: string, fileName: string) => {
+    setClients(prev => prev.map(c => {
+      if (c.id === clientId) {
+        return {
+          ...c,
+          files: c.files.filter(f => f.name !== fileName)
+        };
+      }
+      return c;
+    }));
+  };
+
   const handleGenerateCaption = () => {
     if (!captionGeneratorTopic.trim()) return;
     const topic = captionGeneratorTopic.trim();
@@ -128,19 +221,19 @@ export const AdaptiveStudyDesignModule: React.FC<AdaptiveStudyDesignModuleProps>
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#F8FAFC] overflow-y-auto">
-      {/* Top Banner (Nijo SMM Studio & Agency Hub) */}
+      {/* Top Banner: Replaced with clean "Studio" & "NIJO SMM" */}
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 shadow-2xs">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#0F294A] text-cyan-300 flex items-center justify-center font-bold">
+          <div className="w-10 h-10 rounded-xl bg-[#0F294A] text-cyan-300 flex items-center justify-center font-bold shadow-xs">
             <Briefcase className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold text-[#0F172A] tracking-tight">
-                NIJO SMM Agency & Client Studio
+                Studio
               </h1>
               <span className="text-xs font-semibold px-2 py-0.5 rounded bg-blue-50 text-[#1E3A8A] border border-blue-200">
-                Active Agency Mode
+                NIJO SMM
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -149,17 +242,42 @@ export const AdaptiveStudyDesignModule: React.FC<AdaptiveStudyDesignModuleProps>
           </div>
         </div>
 
-        <button
-          onClick={() => setIsAddClientModalOpen(true)}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#0F294A] hover:bg-[#1E3A8A] text-white text-xs font-bold rounded-lg shadow-sm transition-all cursor-pointer"
-        >
-          <Plus className="w-4 h-4 text-cyan-300" />
-          <span>New Client</span>
-        </button>
+        {/* Action Buttons: Edit Client, Delete Client, Add Client */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {activeClient && (
+            <button
+              onClick={() => handleOpenEditClient(activeClient)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-[#1E3A8A] text-xs font-semibold rounded-lg border border-slate-300 transition-all cursor-pointer shadow-2xs"
+              title={`Edit details for ${activeClient.name}`}
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+              <span>Edit Client</span>
+            </button>
+          )}
+
+          {activeClient && (
+            <button
+              onClick={() => setClientToDelete(activeClient)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg border border-slate-300 transition-all cursor-pointer shadow-2xs"
+              title={`Delete client ${activeClient.name}`}
+            >
+              <Trash2 className="w-3.5 h-3.5 text-slate-500" />
+              <span>Delete Client</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => setIsAddClientModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#0F294A] hover:bg-[#1E3A8A] text-white text-xs font-bold rounded-lg shadow-sm transition-all cursor-pointer active:scale-95"
+          >
+            <Plus className="w-4 h-4 text-cyan-300" />
+            <span>New Client</span>
+          </button>
+        </div>
       </div>
 
       <div className="p-6 space-y-6 max-w-6xl mx-auto w-full">
-        {/* 1. Clients Navigation Boxes */}
+        {/* 1. Clients Navigation Cards with Edit and Delete options */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
@@ -167,13 +285,13 @@ export const AdaptiveStudyDesignModule: React.FC<AdaptiveStudyDesignModuleProps>
               <span>Clients ({clients.length})</span>
             </h2>
             <span className="text-xs text-slate-400 font-mono">
-              Click client box to inspect 24h monitoring & deliverables
+              Click client card to inspect deliverables &amp; reels
             </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             {clients.map((c) => (
-              <button
+              <div
                 key={c.id}
                 onClick={() => setSelectedClientId(c.id)}
                 className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative group ${
@@ -192,9 +310,37 @@ export const AdaptiveStudyDesignModule: React.FC<AdaptiveStudyDesignModuleProps>
                     </div>
                   </div>
 
-                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    {c.contractStatus}
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      {c.contractStatus}
+                    </span>
+
+                    {/* Edit Client Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenEditClient(c);
+                      }}
+                      className="p-1 rounded text-slate-400 hover:text-[#1E3A8A] hover:bg-blue-50 transition-colors"
+                      title={`Edit ${c.name}`}
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+
+                    {/* Delete Client Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setClientToDelete(c);
+                      }}
+                      className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                      title={`Delete ${c.name}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
 
                 <p className="text-[11px] text-slate-500 mt-2 line-clamp-1">
@@ -209,7 +355,7 @@ export const AdaptiveStudyDesignModule: React.FC<AdaptiveStudyDesignModuleProps>
                     ER: {c.engagementRate}
                   </span>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         </div>
@@ -223,9 +369,9 @@ export const AdaptiveStudyDesignModule: React.FC<AdaptiveStudyDesignModuleProps>
               </div>
               <div>
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <span>24/7 Account & Post Monitoring</span>
+                  <span>24/7 Account &amp; Post Monitoring</span>
                   <span className="text-[10px] font-mono text-cyan-300 bg-cyan-500/20 px-2 py-0.5 rounded">
-                    Live Sync
+                    Live Watchdog
                   </span>
                 </h3>
                 <p className="text-xs text-slate-300">
@@ -260,7 +406,7 @@ export const AdaptiveStudyDesignModule: React.FC<AdaptiveStudyDesignModuleProps>
           </div>
         </div>
 
-        {/* 3. Sleek 3-Line Compact Color Palette */}
+        {/* 3. Sleek 3-Line Compact Color Swatch Bar (Strict Zero-Red) */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -274,7 +420,6 @@ export const AdaptiveStudyDesignModule: React.FC<AdaptiveStudyDesignModuleProps>
             </span>
           </div>
 
-          {/* 3-Line Compact Bar */}
           <div className="space-y-2">
             {/* Line 1: Midnight Navy */}
             <button
@@ -311,7 +456,7 @@ export const AdaptiveStudyDesignModule: React.FC<AdaptiveStudyDesignModuleProps>
             <div className="flex items-center gap-2">
               <FolderOpen className="w-4 h-4 text-[#1E3A8A]" />
               <h3 className="text-sm font-bold text-slate-900">
-                {activeClient.name} Asset Vault & Deliverables
+                {activeClient.name} Asset Vault &amp; Deliverables
               </h3>
             </div>
             <span className="text-xs text-slate-500 font-mono">
@@ -350,6 +495,13 @@ export const AdaptiveStudyDesignModule: React.FC<AdaptiveStudyDesignModuleProps>
                   >
                     <Download className="w-3.5 h-3.5 text-cyan-300" />
                     <span>Download</span>
+                  </button>
+                  <button
+                    onClick={() => handleDeleteClientFile(activeClient.id, file.name)}
+                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 rounded-lg transition-colors cursor-pointer"
+                    title={`Delete ${file.name}`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
@@ -470,6 +622,115 @@ export const AdaptiveStudyDesignModule: React.FC<AdaptiveStudyDesignModuleProps>
         </div>
       </div>
 
+      {/* EDIT CLIENT MODAL */}
+      {clientToEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div 
+            className="w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-[#0F294A] text-white p-4 flex items-center justify-between border-b border-[#1E3A8A]">
+              <div className="flex items-center gap-2">
+                <Edit2 className="w-4 h-4 text-cyan-300" />
+                <h3 className="text-xs font-bold text-white tracking-wide">
+                  Edit Client: {clientToEdit.name}
+                </h3>
+              </div>
+              <button
+                onClick={() => setClientToEdit(null)}
+                className="text-slate-300 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditClient} className="p-5 space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Client / Brand Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Instagram Handle
+                </label>
+                <input
+                  type="text"
+                  value={editHandle}
+                  onChange={(e) => setEditHandle(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Brand Niche / Category
+                </label>
+                <input
+                  type="text"
+                  value={editNiche}
+                  onChange={(e) => setEditNiche(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Contract Status
+                  </label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value as any)}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900"
+                  >
+                    <option value="active">Active</option>
+                    <option value="review">Under Review</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Engagement Rate
+                  </label>
+                  <input
+                    type="text"
+                    value={editEngagement}
+                    onChange={(e) => setEditEngagement(e.target.value)}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-slate-900"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setClientToEdit(null)}
+                  className="px-3.5 py-1.5 text-slate-600 hover:bg-slate-100 rounded-lg font-medium cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-1.5 bg-[#0F294A] hover:bg-[#1E3A8A] text-white font-bold rounded-lg shadow-sm cursor-pointer"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Add Client Modal */}
       {isAddClientModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
@@ -537,13 +798,13 @@ export const AdaptiveStudyDesignModule: React.FC<AdaptiveStudyDesignModuleProps>
                 <button
                   type="button"
                   onClick={() => setIsAddClientModalOpen(false)}
-                  className="px-3.5 py-1.5 text-slate-600 hover:bg-slate-100 rounded-lg font-medium"
+                  className="px-3.5 py-1.5 text-slate-600 hover:bg-slate-100 rounded-lg font-medium cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-1.5 bg-[#0F294A] hover:bg-[#1E3A8A] text-white font-bold rounded-lg shadow-sm"
+                  className="px-5 py-1.5 bg-[#0F294A] hover:bg-[#1E3A8A] text-white font-bold rounded-lg shadow-sm cursor-pointer"
                 >
                   Add Client
                 </button>
@@ -552,6 +813,46 @@ export const AdaptiveStudyDesignModule: React.FC<AdaptiveStudyDesignModuleProps>
           </div>
         </div>
       )}
+
+      {/* Delete Client Confirmation Modal */}
+      {clientToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-sm w-full p-5 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-slate-700" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Delete Client</h3>
+                <p className="text-xs text-slate-500">Remove from Studio</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Are you sure you want to delete <strong className="text-slate-900">{clientToDelete.name}</strong> ({clientToDelete.handle})? All associated deliverables and tracking records will be removed.
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setClientToDelete(null)}
+                className="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleConfirmDeleteClient(clientToDelete.id)}
+                className="px-4 py-1.5 text-xs font-bold bg-[#0F294A] hover:bg-[#1E3A8A] text-white rounded-lg shadow-sm transition-colors cursor-pointer"
+              >
+                Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
+export default AdaptiveStudyDesignModule;
