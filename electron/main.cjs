@@ -146,6 +146,11 @@ function startLocalHubServer() {
     localServer = hubApp.listen(HUB_PORT, '0.0.0.0', () => {
       console.log(`[NIJO PVT PC] Local Hub Server running at http://0.0.0.0:${HUB_PORT}`);
     });
+    // Without this, "port already in use" is an uncaught error that crashes the whole app
+    localServer.on('error', (err) => {
+      console.warn(`[NIJO PVT PC] Hub server not started (${err.code || err.message}); file sharing hub disabled.`);
+      localServer = null;
+    });
   } catch (err) {
     console.warn('[NIJO PVT PC] Embedded hub server fallback:', err.message);
   }
@@ -232,7 +237,25 @@ function createTray() {
   }
 }
 
+// Only one copy of the app: a second launch just brings the existing window to the front
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
+process.on('uncaughtException', (err) => {
+  console.error('[NIJO PVT PC] Unexpected error (app kept running):', err);
+});
+
 app.whenReady().then(() => {
+  if (!app.hasSingleInstanceLock()) return;
   app.setAppUserModelId('com.nijo.pvt.pc'); // needed for Windows notifications
   store = new DataStore(app.getPath('userData'));
   agent = new NijoAgent(store, getApiKey);
