@@ -21,12 +21,10 @@ export const VoiceModule: React.FC = () => {
     setStatus(s);
     if (!s.ok) return;
     try {
-      const list = await api.voiceProfiles();
+      // Only Nijo's own cloned voice(s) - built-in/preset voices are never used here
+      const list = (await api.voiceProfiles()).filter((p) => p.voice_type === 'cloned');
       setProfiles(list);
-      if (!list.some((p) => p.id === profileId)) {
-        const mine = list.find((p) => p.voice_type === 'cloned') ?? list[0];
-        setProfileId(mine?.id ?? '');
-      }
+      if (!list.some((p) => p.id === profileId)) setProfileId(list[0]?.id ?? '');
     } catch (e) { setError(String((e as Error).message || e)); }
   };
 
@@ -42,7 +40,7 @@ export const VoiceModule: React.FC = () => {
     if (!profile || !text.trim()) return;
     setBusy(true); setError('');
     try {
-      const engine = profile.default_engine || (profile.voice_type === 'cloned' ? 'qwen' : undefined);
+      const engine = profile.default_engine || 'qwen';
       const res = await api.voiceSpeak({ profileId: profile.id, text: text.trim(), engine, language: profile.language || 'en' });
       setClips((c) => [{ id: res.id, text: text.trim(), dataUrl: res.dataUrl, duration: res.duration, voice: profile.name }, ...c]);
     } catch (e) {
@@ -73,9 +71,9 @@ export const VoiceModule: React.FC = () => {
         <label className="block text-xs font-semibold text-slate-600">Voice</label>
         <select value={profileId} onChange={(e) => setProfileId(e.target.value)}
           className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white">
-          {profiles.length === 0 && <option value="">No voices yet — create one in the Voicebox app</option>}
+          {profiles.length === 0 && <option value="">Your voice is not set up yet — record it in Voicebox: Create Voice → Clone from audio</option>}
           {profiles.map((p) => (
-            <option key={p.id} value={p.id}>{p.name} {p.voice_type === 'cloned' ? '(my voice clone)' : '(built-in)'}</option>
+            <option key={p.id} value={p.id}>{p.name} (my voice)</option>
           ))}
         </select>
         <label className="block text-xs font-semibold text-slate-600">Text</label>
