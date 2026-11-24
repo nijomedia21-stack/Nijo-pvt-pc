@@ -1,11 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  WorkspaceMode, 
-  Task, 
-  CalendarEvent, 
-  TransferHistoryItem, 
-  ConnectedDevice 
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  WorkspaceMode,
+  Task,
+  CalendarEvent,
+  TransferHistoryItem,
+  ConnectedDevice,
+  Note
 } from './types';
+import { NotesModule } from './components/NotesModule';
+import { VoiceModule } from './components/VoiceModule';
 import { 
   INITIAL_TASKS, 
   INITIAL_TRANSFERS, 
@@ -23,6 +26,49 @@ import { CopilotWidget } from './components/CopilotWidget';
 import { SettingsModal } from './components/SettingsModal';
 import { LockScreen } from './components/LockScreen';
 import { DailySummaryModal } from './components/DailySummaryModal';
+
+const DEFAULT_EVENTS: CalendarEvent[] = [
+  {
+    id: 'ev-1',
+    title: 'Mathematics I: Semester 1 Board Exam',
+    date: '2026-11-24',
+    time: '09:30',
+    type: 'exam',
+    vibrationTrigger: 'poly',
+    notes: 'Hall 4, Polytechnic Campus. Carry Scientific Calculator and Hall Ticket.',
+    workspace: 'study'
+  },
+  {
+    id: 'ev-2',
+    title: 'Libra Reel 04 Launch (Navy Aesthetics)',
+    date: '2026-11-04',
+    time: '19:30',
+    type: 'reels',
+    vibrationTrigger: 'rapid',
+    notes: 'Push 60fps vertical render to Instagram and verify audio licensing.',
+    workspace: 'design'
+  },
+  {
+    id: 'ev-3',
+    title: 'Applied Physics Board Exam',
+    date: '2026-11-27',
+    time: '09:30',
+    type: 'exam',
+    vibrationTrigger: 'poly',
+    notes: 'Revise Numerical Aperture and Laser equations.',
+    workspace: 'study'
+  },
+  {
+    id: 'ev-4',
+    title: 'Mandala Kalam Begins (Vrischikam 1)',
+    date: '2026-11-16',
+    time: '06:00',
+    type: 'festival',
+    vibrationTrigger: 'gentle',
+    notes: 'Kerala traditional observance.',
+    workspace: 'general'
+  }
+];
 
 export default function App() {
   // Authentication & Lock State
@@ -55,48 +101,49 @@ export default function App() {
     return new Date().toISOString().split('T')[0];
   });
 
-  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([
-    {
-      id: 'ev-1',
-      title: 'Mathematics I: Semester 1 Board Exam',
-      date: '2026-11-24',
-      time: '09:30',
-      type: 'exam',
-      vibrationTrigger: 'poly',
-      notes: 'Hall 4, Polytechnic Campus. Carry Scientific Calculator and Hall Ticket.',
-      workspace: 'study'
-    },
-    {
-      id: 'ev-2',
-      title: 'Libra Reel 04 Launch (Navy Aesthetics)',
-      date: '2026-11-04',
-      time: '19:30',
-      type: 'reels',
-      vibrationTrigger: 'rapid',
-      notes: 'Push 60fps vertical render to Instagram and verify audio licensing.',
-      workspace: 'design'
-    },
-    {
-      id: 'ev-3',
-      title: 'Applied Physics Board Exam',
-      date: '2026-11-27',
-      time: '09:30',
-      type: 'exam',
-      vibrationTrigger: 'poly',
-      notes: 'Revise Numerical Aperture and Laser equations.',
-      workspace: 'study'
-    },
-    {
-      id: 'ev-4',
-      title: 'Mandala Kalam Begins (Vrischikam 1)',
-      date: '2026-11-16',
-      time: '06:00',
-      type: 'festival',
-      vibrationTrigger: 'gentle',
-      notes: 'Kerala traditional observance.',
-      workspace: 'general'
+  const [notes, setNotes] = useState<Note[]>(() => {
+    const saved = localStorage.getItem('nijo_pvt_notes');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(() => {
+    const saved = localStorage.getItem('nijo_pvt_events');
+    return saved ? JSON.parse(saved) : DEFAULT_EVENTS;
+  });
+
+  // Desktop app: tasks / events / notes live in the local data store (main process),
+  // so the Copilot agent and reminder notifications see the same data.
+  const storeLoaded = useRef<boolean>(!window.electronAPI);
+  useEffect(() => {
+    const api = window.electronAPI;
+    if (!api) return;
+    let off: (() => void) | undefined;
+    api.storeGet().then((data) => {
+      if (data.initialized) {
+        setTasks(data.tasks);
+        setCalendarEvents(data.events);
+        setNotes(data.notes);
+      } else {
+        api.storeSet({ tasks, events: calendarEvents, notes });
+      }
+      storeLoaded.current = true;
+      off = api.onStoreChanged((d) => {
+        setTasks(d.tasks);
+        setCalendarEvents(d.events);
+        setNotes(d.notes);
+      });
+    });
+    return () => off?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('nijo_pvt_events', JSON.stringify(calendarEvents));
+    localStorage.setItem('nijo_pvt_notes', JSON.stringify(notes));
+    if (window.electronAPI && storeLoaded.current) {
+      window.electronAPI.storeSet({ tasks, events: calendarEvents, notes });
     }
-  ]);
+  }, [tasks, calendarEvents, notes]);
 
   const [transfers, setTransfers] = useState<TransferHistoryItem[]>(() => {
     const saved = localStorage.getItem('nijo_pvt_transfers');
@@ -241,6 +288,12 @@ export default function App() {
               securityPin={securityPin}
             />
           )}
+
+          {activeTab === 'notes' && (
+            <NotesModule notes={notes} onChange={setNotes} />
+          )}
+
+          {activeTab === 'voice' && <VoiceModule />}
 
           {activeTab === 'adaptive' && (
             <AdaptiveStudyDesignModule

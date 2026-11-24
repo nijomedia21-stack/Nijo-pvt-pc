@@ -6,11 +6,13 @@ import {
   Briefcase, 
   PanelLeftClose,
   PanelLeftOpen,
-  Sparkles
+  Sparkles,
+  StickyNote,
+  Mic
 } from 'lucide-react';
 import { WorkspaceMode } from '../types';
 
-export type NavigationTab = 'tasks' | 'calendar' | 'files' | 'adaptive';
+export type NavigationTab = 'tasks' | 'calendar' | 'notes' | 'voice' | 'files' | 'adaptive';
 
 interface NavigationSidebarProps {
   activeTab: NavigationTab;
@@ -100,6 +102,28 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
               {!isCollapsed && <span>Calendar</span>}
             </div>
           </button>
+
+          {/* Notes & Text-to-my-voice */}
+          {([
+            { id: 'notes', label: 'Notes', Icon: StickyNote },
+            { id: 'voice', label: 'My Voice', Icon: Mic },
+          ] as const).map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              onClick={() => onSelectTab(id)}
+              className={`w-full flex items-center ${isCollapsed ? 'justify-center p-2.5' : 'justify-between px-3 py-2.5'} rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                activeTab === id
+                  ? 'bg-[#1E3A8A] text-white shadow-sm font-semibold'
+                  : 'text-slate-300 hover:text-white hover:bg-white/5'
+              }`}
+              title={label}
+            >
+              <div className="flex items-center gap-3">
+                <Icon className={`w-4 h-4 ${activeTab === id ? 'text-cyan-300' : 'text-slate-400'}`} />
+                {!isCollapsed && <span>{label}</span>}
+              </div>
+            </button>
+          ))}
 
           {/* 3. File Sharing (Socket.io Laptop/Mobile/TV) */}
           <button

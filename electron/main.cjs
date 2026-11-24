@@ -1,8 +1,56 @@
 // electron/main.cjs - NIJO PVT PC Desktop Application
-const { app, BrowserWindow, ipcMain, Tray, Menu, shell, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, shell, dialog, Notification, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
+const { DataStore } = require('./store.cjs');
+const { NijoAgent } = require('./agent.cjs');
+
+// Voicebox via NIJO CloudLink (laptop-only proxy to the private cloud GPU)
+const VOICE_URL = 'http://127.0.0.1:17493';
+let store = null;
+let agent = null;
+
+// ---- Claude API key: encrypted with Windows DPAPI (safeStorage), never in the repo ----
+function keyFile() { return path.join(app.getPath('userData'), 'claude-key.bin'); }
+function getApiKey() {
+  try {
+    if (!fs.existsSync(keyFile())) return process.env.ANTHROPIC_API_KEY || '';
+    return safeStorage.decryptString(fs.readFileSync(keyFile()));
+  } catch { return ''; }
+}
+function setApiKey(key) {
+  if (!key) { if (fs.existsSync(keyFile())) fs.unlinkSync(keyFile()); return true; }
+  fs.writeFileSync(keyFile(), safeStorage.encryptString(key.trim()));
+  return true;
+}
+
+// ---- Task reminder notifications ----
+function checkReminders() {
+  if (!store) return;
+  const d = store.get();
+  const now = new Date();
+  const notified = new Set(d.notified || []);
+  let changed = false;
+  for (const t of d.tasks) {
+    if (t.completed || !t.dueDate || notified.has(t.id)) continue;
+    const due = new Date(`${t.dueDate}T${t.dueTime || '09:00'}:00`);
+    if (isNaN(due.getTime())) continue;
+    if (due <= now && now - due < 6 * 3600 * 1000) {
+      new Notification({ title: `Task: ${t.title}`, body: t.description || `Due ${t.dueDate} ${t.dueTime || ''}`.trim() }).show();
+      notified.add(t.id);
+      changed = true;
+    }
+  }
+  if (changed) store.set({ notified: [...notified] }, 'system');
+}
+
+// ---- Voice (text to my voice) ----
+async function voiceJson(p, opts) {
+  const r = await fetch(VOICE_URL + p, { ...opts, signal: AbortSignal.timeout(60000) });
+  if (!r.ok) throw new Error(`Voice server ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  return r.json();
+}
 
 let mainWindow = null;
 let tray = null;
@@ -185,6 +233,14 @@ function createTray() {
 }
 
 app.whenReady().then(() => {
+  app.setAppUserModelId('com.nijo.pvt.pc'); // needed for Windows notifications
+  store = new DataStore(app.getPath('userData'));
+  agent = new NijoAgent(store, getApiKey);
+  store.on('change', (source) => {
+    if (source !== 'ui' && mainWindow) mainWindow.webContents.send('store:changed', store.get());
+  });
+  setInterval(checkReminders, 30 * 1000);
+  setTimeout(checkReminders, 5000);
   startLocalHubServer();
   createWindow();
   createTray();
@@ -219,6 +275,51 @@ ipcMain.handle('app:open-folder', async (event, folderPath) => {
   const defaultDir = path.join(app.getPath('userData'), 'uploads');
   shell.openPath(defaultDir);
   return true;
+});
+
+// ---- Data store ----
+ipcMain.handle('store:get', () => store.get());
+ipcMain.handle('store:set', (event, patch) => store.set(patch || {}, 'ui'));
+
+// ---- Agent ----
+ipcMain.handle('agent:chat', (event, { message, mode }) => agent.chat(String(message || ''), mode || 'study'));
+ipcMain.handle('agent:reset', () => { agent.reset(); return true; });
+ipcMain.handle('agent:has-key', () => !!getApiKey());
+ipcMain.handle('agent:set-key', (event, key) => setApiKey(String(key || '')));
+
+// ---- Voice ----
+ipcMain.handle('voice:status', async () => {
+  try {
+    const h = await voiceJson('/health');
+    let mode = 'unknown';
+    try { mode = (await voiceJson('/__cloudlink')).mode; } catch {}
+    return { ok: true, gpu: h.gpu_type || '', mode };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+ipcMain.handle('voice:profiles', async () => voiceJson('/profiles'));
+ipcMain.handle('voice:speak', async (event, { profileId, text, engine, language }) => {
+  const gen = await voiceJson('/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ profile_id: profileId, text, language: language || 'en', ...(engine ? { engine } : {}) }),
+  });
+  for (let i = 0; i < 300; i++) {
+    const h = await voiceJson(`/history/${gen.id}`);
+    if (h.status === 'completed') {
+      const r = await fetch(`${VOICE_URL}/audio/${gen.id}`);
+      const buf = Buffer.from(await r.arrayBuffer());
+      return { id: gen.id, duration: h.duration, dataUrl: `data:audio/wav;base64,${buf.toString('base64')}` };
+    }
+    if (h.status === 'failed' || h.error) throw new Error(h.error || 'Generation failed');
+    await new Promise((res) => setTimeout(res, 2000));
+  }
+  throw new Error('Voice generation timed out');
+});
+ipcMain.handle('voice:save', async (event, { dataUrl, name }) => {
+  const res = await dialog.showSaveDialog(mainWindow, { defaultPath: name || 'my-voice.wav', filters: [{ name: 'WAV audio', extensions: ['wav'] }] });
+  if (res.canceled || !res.filePath) return false;
+  fs.writeFileSync(res.filePath, Buffer.from(dataUrl.split(',')[1], 'base64'));
+  return res.filePath;
 });
 
 ipcMain.handle('app:save-file-dialog', async (event, defaultName) => {
