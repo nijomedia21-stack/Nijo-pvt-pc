@@ -290,6 +290,16 @@ app.on('window-all-closed', () => {
 
 // IPC handlers for native Windows dialogs and explorer actions
 ipcMain.handle('app:get-version', () => app.getVersion());
+// Laptop's Wi-Fi/LAN IPv4 address, for the phone QR code / hub link
+ipcMain.handle('app:lan-ip', () => {
+  const nets = require('os').networkInterfaces();
+  for (const list of Object.values(nets)) {
+    for (const n of list || []) {
+      if (n.family === 'IPv4' && !n.internal && !n.address.startsWith('169.254.')) return n.address;
+    }
+  }
+  return '127.0.0.1';
+});
 ipcMain.handle('app:open-folder', async (event, folderPath) => {
   if (folderPath && fs.existsSync(folderPath)) {
     shell.openPath(folderPath);

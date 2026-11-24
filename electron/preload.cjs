@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   isDesktopApp: true,
   platform: 'win32',
   getVersion: () => ipcRenderer.invoke('app:get-version'),
+  getLanIp: () => ipcRenderer.invoke('app:lan-ip'),
   openUploadsFolder: (folderPath) => ipcRenderer.invoke('app:open-folder', folderPath),
   saveFileDialog: (defaultName) => ipcRenderer.invoke('app:save-file-dialog', defaultName),
 

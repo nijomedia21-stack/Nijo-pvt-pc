@@ -142,9 +142,14 @@ export const FilesModule: React.FC<FilesModuleProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importReceivedInputRef = useRef<HTMLInputElement>(null);
 
-  const serverUrl = 'http://192.168.1.2:4000';
+  // This laptop talks to its own hub on 127.0.0.1; the phone uses the laptop's Wi-Fi IP (lanUrl)
+  const serverUrl = 'http://127.0.0.1:4000';
+  const [lanUrl, setLanUrl] = useState<string>('http://127.0.0.1:4000');
+  useEffect(() => {
+    window.electronAPI?.getLanIp().then((ip) => setLanUrl(`http://${ip}:4000`));
+  }, []);
 
-  // Listen to SSE (/events) from local Wi-Fi server (http://192.168.1.2:4000/events)
+  // Listen to SSE (/events) from the local hub server
   useEffect(() => {
     let eventSource: EventSource | null = null;
     try {
@@ -702,7 +707,7 @@ export const FilesModule: React.FC<FilesModuleProps> = ({
                 </span>
               ) : (
                 <span className="text-xs text-slate-400">
-                  Ready to stream on local subnet 192.168.1.2:4000
+                  Ready to stream on local subnet {lanUrl.replace('http://', '')}
                 </span>
               )}
 
@@ -1016,7 +1021,7 @@ export const FilesModule: React.FC<FilesModuleProps> = ({
               {/* High Contrast Clean SVG QR Matrix */}
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 inline-block shadow-inner">
                 <svg viewBox="0 0 25 25" className="w-44 h-44 mx-auto bg-white p-2 rounded-xl">
-                  {generateQrMatrix(`http://192.168.1.2:4000/connect?token=${dynamicToken}&pin=${securityPin}`).map((row, r) =>
+                  {generateQrMatrix(`${lanUrl}/connect?token=${dynamicToken}&pin=${securityPin}`).map((row, r) =>
                     row.map((isDark, c) =>
                       isDark ? (
                         <rect
@@ -1050,7 +1055,7 @@ export const FilesModule: React.FC<FilesModuleProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    navigator.clipboard.writeText(`http://192.168.1.2:4000/connect?token=${dynamicToken}&pin=${securityPin}`);
+                    navigator.clipboard.writeText(`${lanUrl}/connect?token=${dynamicToken}&pin=${securityPin}`);
                     setQrCopied(true);
                     setTimeout(() => setQrCopied(false), 2000);
                   }}

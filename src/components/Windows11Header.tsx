@@ -62,7 +62,7 @@ export const Windows11Header: React.FC<Windows11HeaderProps> = ({
 
     const checkLocalHub = async () => {
       try {
-        const res = await fetch('http://192.168.1.2:4000/status', { 
+        const res = await fetch('http://127.0.0.1:4000/status', { 
           signal: AbortSignal.timeout(2000) 
         });
         if (res.ok) setLocalHubOnline(true);

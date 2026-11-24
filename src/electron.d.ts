@@ -22,6 +22,7 @@ declare global {
       isDesktopApp: boolean;
       platform: string;
       getVersion: () => Promise<string>;
+      getLanIp: () => Promise<string>;
       openUploadsFolder: (folderPath?: string) => Promise<boolean>;
       saveFileDialog: (defaultName?: string) => Promise<unknown>;
       storeGet: () => Promise<StoreData>;
