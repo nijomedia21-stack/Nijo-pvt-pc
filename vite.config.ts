@@ -153,6 +153,8 @@ I'm ready to assist with:
 
 export default defineConfig(() => {
   return {
+    // Relative asset paths so the packaged Electron app (loaded from file://) can find its JS/CSS
+    base: './',
     plugins: [react(), tailwindcss(), copilotApiPlugin()],
     resolve: {
       alias: {
