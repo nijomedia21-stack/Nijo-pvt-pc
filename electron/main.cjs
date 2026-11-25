@@ -381,6 +381,24 @@ ipcMain.handle('voice:ml-status', async () => {
     return { ok: h.status === 'healthy', gpu: h.gpu || '' };
   } catch (e) { mlUrl.at = 0; return { ok: false, error: e.message }; }
 });
+// Start the Kaggle background run (same as the Desktop "Start Malayalam Server" button)
+function runKaggle(args) {
+  return new Promise((resolve) => {
+    require('child_process').execFile('python', ['-m', 'kaggle', ...args], { timeout: 180000, windowsHide: true },
+      (err, stdout, stderr) => resolve({ ok: !err, out: `${stdout || ''}${stderr || ''}`.trim() }));
+  });
+}
+ipcMain.handle('voice:ml-start', async () => {
+  const s = mlSettings();
+  const dir = s.kaggleDir || 'C:\\voice\\malayalam\\kaggle-job\\push';
+  const st = await runKaggle(['kernels', 'status', 'capcutvpn/nijo-malayalam-server']);
+  if (/RUNNING|QUEUED/.test(st.out)) return { ok: true, message: 'Server is already starting or running on Kaggle. Wait a few minutes, then press Refresh.' };
+  const r = await runKaggle(['kernels', 'push', '-p', dir]);
+  mlUrl.at = 0;
+  return r.ok && /successfully/i.test(r.out)
+    ? { ok: true, message: 'Started on Kaggle. Ready in about 5–10 minutes (longer if Kaggle has a GPU queue). Press Refresh then.' }
+    : { ok: false, message: `Could not start: ${r.out.slice(-300)}` };
+});
 ipcMain.handle('voice:speak-ml', async (event, { text }) => {
   const s = mlSettings();
   const base = await mlBase();

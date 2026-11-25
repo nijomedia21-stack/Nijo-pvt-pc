@@ -38,6 +38,7 @@ declare global {
       voiceSave: (args: { dataUrl: string; name?: string }) => Promise<string | false>;
       voiceMlStatus: () => Promise<{ ok: boolean; gpu?: string; error?: string }>;
       voiceSpeakMl: (args: { text: string }) => Promise<{ id: string; duration: number; dataUrl: string }>;
+      voiceMlStart: () => Promise<{ ok: boolean; message: string }>;
     };
   }
 }

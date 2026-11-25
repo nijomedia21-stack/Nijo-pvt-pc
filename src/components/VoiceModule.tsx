@@ -17,6 +17,8 @@ export const VoiceModule: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [clips, setClips] = useState<Clip[]>([]);
+  const [starting, setStarting] = useState(false);
+  const [startMsg, setStartMsg] = useState('');
 
   const refresh = async () => {
     if (!api) return;
@@ -61,12 +63,19 @@ export const VoiceModule: React.FC = () => {
     } finally { setBusy(false); }
   };
 
+  const startMl = async () => {
+    setStarting(true); setStartMsg('');
+    try { setStartMsg((await api.voiceMlStart()).message); }
+    catch (e) { setStartMsg(String((e as Error).message || e)); }
+    finally { setStarting(false); }
+  };
+
   const st = lang === 'ml' ? mlStatus : status;
   const statusText = st === null ? 'Checking voice server…'
     : st.ok
       ? (lang === 'ml' ? `Malayalam voice server online (cloud GPU) · ${st.gpu}`
         : `Voice server online${st.mode === 'cloud' ? ' (cloud GPU)' : st.mode === 'local' ? ' (laptop GPU)' : ''} · ${st.gpu}`)
-      : (lang === 'ml' ? 'Malayalam server offline. Open Kaggle notebook "nijo-malayalam-server" and run it.'
+      : (lang === 'ml' ? 'Malayalam server is off. Press Start server.'
         : 'Voice server offline. Start Voicebox (or the Kaggle notebook) and press Refresh.');
 
   return (
@@ -92,8 +101,15 @@ export const VoiceModule: React.FC = () => {
 
       <div className={`text-xs rounded-lg px-3 py-2 flex items-center gap-2 ${st?.ok ? 'bg-blue-50 text-[#1E3A8A]' : 'bg-amber-50 text-amber-800'}`}>
         {lang === 'ml' || st?.mode === 'cloud' ? <Cloud className="w-3.5 h-3.5" /> : <Laptop className="w-3.5 h-3.5" />}
-        {statusText}
+        <span className="flex-1">{statusText}</span>
+        {lang === 'ml' && st && !st.ok && (
+          <button onClick={startMl} disabled={starting}
+            className="shrink-0 text-xs px-3 py-1 rounded-md bg-[#1E3A8A] text-white disabled:opacity-50">
+            {starting ? 'Starting…' : 'Start server'}
+          </button>
+        )}
       </div>
+      {startMsg && lang === 'ml' && <p className="text-xs text-slate-600">{startMsg}</p>}
 
       <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
         {lang === 'en' && (<>
