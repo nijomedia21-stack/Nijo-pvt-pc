@@ -29,4 +29,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   voiceProfiles: () => ipcRenderer.invoke('voice:profiles'),
   voiceSpeak: (args) => ipcRenderer.invoke('voice:speak', args),
   voiceSave: (args) => ipcRenderer.invoke('voice:save', args),
+  voiceMlStatus: () => ipcRenderer.invoke('voice:ml-status'),
+  voiceSpeakMl: (args) => ipcRenderer.invoke('voice:speak-ml', args),
 });

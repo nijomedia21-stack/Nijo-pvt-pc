@@ -348,6 +348,71 @@ ipcMain.handle('voice:speak', async (event, { profileId, text, engine, language 
   }
   throw new Error('Voice generation timed out');
 });
+// ---- Malayalam in my voice (IndicF5 on the private Kaggle GPU) ----
+// Paths can be overridden in <userData>/malayalam.json
+const ML_DEFAULTS = {
+  config: 'C:\\voice\\cloudlink\\config.json',          // private key + topic
+  refAudio: 'C:\\voice\\malayalam\\ref_en_clean.wav',   // Nijo's own voice sample
+  refText: 'C:\\voice\\malayalam\\ref_en.txt',          // exact words in that sample
+};
+function mlSettings() {
+  try { return { ...ML_DEFAULTS, ...JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'malayalam.json'), 'utf8')) }; }
+  catch { return ML_DEFAULTS; }
+}
+const readText = (p) => fs.readFileSync(p, 'utf8').replace(/^\uFEFF/, '').trim();
+let mlUrl = { url: null, at: 0 };
+async function mlBase() {
+  const s = mlSettings();
+  const cfg = JSON.parse(readText(s.config));
+  if (!mlUrl.url || Date.now() - mlUrl.at > 60000) {
+    const r = await fetch(`https://ntfy.sh/${cfg.topic}-ml/json?poll=1&since=12h`, { signal: AbortSignal.timeout(15000) });
+    const msgs = (await r.text()).trim().split('\n').filter(Boolean)
+      .map((l) => { try { return JSON.parse(l); } catch { return {}; } })
+      .filter((m) => m.event === 'message');
+    mlUrl = { url: msgs.length ? msgs[msgs.length - 1].message : null, at: Date.now() };
+  }
+  if (!mlUrl.url) throw new Error('Malayalam cloud server is offline. Start the Kaggle notebook "nijo-malayalam-server".');
+  return `${mlUrl.url}/k/${cfg.key}`;
+}
+ipcMain.handle('voice:ml-status', async () => {
+  try {
+    const base = await mlBase();
+    const h = await (await fetch(`${base}/health`, { signal: AbortSignal.timeout(15000) })).json();
+    return { ok: h.status === 'healthy', gpu: h.gpu || '' };
+  } catch (e) { mlUrl.at = 0; return { ok: false, error: e.message }; }
+});
+ipcMain.handle('voice:speak-ml', async (event, { text }) => {
+  const s = mlSettings();
+  const base = await mlBase();
+  const fd = new FormData();
+  fd.append('text', String(text || ''));
+  fd.append('ref_text', readText(s.refText));
+  fd.append('ref_audio', new Blob([fs.readFileSync(s.refAudio)], { type: 'audio/wav' }), 'ref.wav');
+  // Start a job, then poll: the tunnel drops any single request longer than ~100 s
+  const start = await fetch(`${base}/job`, { method: 'POST', body: fd, signal: AbortSignal.timeout(60000) });
+  if (!start.ok) { mlUrl.at = 0; throw new Error(`Malayalam server ${start.status}: ${(await start.text()).slice(0, 200)}`); }
+  const { job } = await start.json();
+  const deadline = Date.now() + 15 * 60000;
+  let buf = null;
+  while (Date.now() < deadline) {
+    await new Promise((res) => setTimeout(res, 3000));
+    let r;
+    try { r = await fetch(`${base}/job/${job}`, { signal: AbortSignal.timeout(60000) }); }
+    catch { continue; }                       // brief network hiccup: keep waiting
+    if (r.status === 202) continue;
+    if (!r.ok) {
+      const t = await r.text();
+      let msg = t.slice(0, 200);
+      try { msg = JSON.parse(t).error || msg; } catch { /* not JSON */ }
+      throw new Error(`Malayalam voice failed: ${msg}`);
+    }
+    buf = Buffer.from(await r.arrayBuffer());
+    break;
+  }
+  if (!buf) throw new Error('Malayalam voice timed out (15 min). Try a shorter text.');
+  return { id: `ml-${Date.now()}`, duration: Math.max(0, (buf.length - 44) / 48000), dataUrl: `data:audio/wav;base64,${buf.toString('base64')}` };
+});
+
 ipcMain.handle('voice:save', async (event, { dataUrl, name }) => {
   const res = await dialog.showSaveDialog(mainWindow, { defaultPath: name || 'my-voice.wav', filters: [{ name: 'WAV audio', extensions: ['wav'] }] });
   if (res.canceled || !res.filePath) return false;
