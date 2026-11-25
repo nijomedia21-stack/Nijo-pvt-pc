@@ -407,7 +407,14 @@ ipcMain.handle('voice:speak-ml', async (event, { text }) => {
   fd.append('ref_text', readText(s.refText));
   fd.append('ref_audio', new Blob([fs.readFileSync(s.refAudio)], { type: 'audio/wav' }), 'ref.wav');
   // Start a job, then poll: the tunnel drops any single request longer than ~100 s
-  const start = await fetch(`${base}/job`, { method: 'POST', body: fd, signal: AbortSignal.timeout(60000) });
+  let start;
+  for (let attempt = 1; ; attempt++) {
+    try { start = await fetch(`${base}/job`, { method: 'POST', body: fd, signal: AbortSignal.timeout(60000) }); break; }
+    catch (e) {                                // network blip on slow/mobile internet: retry a few times
+      if (attempt >= 3) throw new Error(`Cannot reach the voice server (${e.message}). Check internet and press Refresh.`);
+      await new Promise((res) => setTimeout(res, 3000 * attempt));
+    }
+  }
   if (!start.ok) { mlUrl.at = 0; throw new Error(`Malayalam server ${start.status}: ${(await start.text()).slice(0, 200)}`); }
   const { job } = await start.json();
   const deadline = Date.now() + 15 * 60000;

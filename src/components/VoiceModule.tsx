@@ -1,18 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Mic, Play, Download, RefreshCw, Cloud, Laptop } from 'lucide-react';
-import type { VoiceProfile } from '../electron.d';
+import { Mic, Play, Download, RefreshCw, Cloud } from 'lucide-react';
 
 interface Clip { id: string; text: string; dataUrl: string; duration: number; voice: string }
 type Lang = 'en' | 'ml';
-type Status = { ok: boolean; gpu?: string; mode?: string; error?: string } | null;
+type Status = { ok: boolean; gpu?: string; error?: string } | null;
 
+// Both languages use Nijo's own voice on the private Kaggle cloud GPU server
 export const VoiceModule: React.FC = () => {
   const api = window.electronAPI;
   const [lang, setLang] = useState<Lang>('ml');
   const [status, setStatus] = useState<Status>(null);
-  const [mlStatus, setMlStatus] = useState<Status>(null);
-  const [profiles, setProfiles] = useState<VoiceProfile[]>([]);
-  const [profileId, setProfileId] = useState('');
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -22,18 +19,8 @@ export const VoiceModule: React.FC = () => {
 
   const refresh = async () => {
     if (!api) return;
-    setError('');
-    setMlStatus(null);
-    api.voiceMlStatus().then(setMlStatus).catch((e) => setMlStatus({ ok: false, error: String(e?.message || e) }));
-    const s = await api.voiceStatus().catch((e) => ({ ok: false, error: String(e?.message || e) }));
-    setStatus(s);
-    if (!s.ok) return;
-    try {
-      // Only Nijo's own cloned voice(s) - built-in/preset voices are never used here
-      const list = (await api.voiceProfiles()).filter((p) => p.voice_type === 'cloned');
-      setProfiles(list);
-      if (!list.some((p) => p.id === profileId)) setProfileId(list[0]?.id ?? '');
-    } catch (e) { setError(String((e as Error).message || e)); }
+    setError(''); setStatus(null);
+    setStatus(await api.voiceMlStatus().catch((e) => ({ ok: false, error: String(e?.message || e) })));
   };
 
   useEffect(() => { refresh(); }, []);
@@ -42,48 +29,38 @@ export const VoiceModule: React.FC = () => {
     return <div className="p-6 text-sm text-slate-500">Text to voice works in the desktop app (NIJO PVT PC).</div>;
   }
 
-  const profile = profiles.find((p) => p.id === profileId);
-  const canSpeak = !!text.trim() && !busy && (lang === 'ml' || !!profile);
+  const canSpeak = !!text.trim() && !busy;
 
   const speak = async () => {
     if (!canSpeak) return;
     const t = text.trim();
     setBusy(true); setError('');
     try {
-      if (lang === 'ml') {
-        const res = await api.voiceSpeakMl({ text: t });
-        setClips((c) => [{ id: res.id, text: t, dataUrl: res.dataUrl, duration: res.duration, voice: 'My voice (Malayalam)' }, ...c]);
-      } else if (profile) {
-        const engine = profile.default_engine || 'qwen';
-        const res = await api.voiceSpeak({ profileId: profile.id, text: t, engine, language: profile.language || 'en' });
-        setClips((c) => [{ id: res.id, text: t, dataUrl: res.dataUrl, duration: res.duration, voice: `${profile.name} (English)` }, ...c]);
-      }
+      const res = await api.voiceSpeakMl({ text: t });
+      const voice = lang === 'ml' ? 'My voice (Malayalam)' : 'My voice (English)';
+      setClips((c) => [{ id: res.id, text: t, dataUrl: res.dataUrl, duration: res.duration, voice }, ...c]);
     } catch (e) {
       setError(String((e as Error).message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''));
     } finally { setBusy(false); }
   };
 
-  const startMl = async () => {
+  const startServer = async () => {
     setStarting(true); setStartMsg('');
     try { setStartMsg((await api.voiceMlStart()).message); }
     catch (e) { setStartMsg(String((e as Error).message || e)); }
     finally { setStarting(false); }
   };
 
-  const st = lang === 'ml' ? mlStatus : status;
-  const statusText = st === null ? 'Checking voice server…'
-    : st.ok
-      ? (lang === 'ml' ? `Malayalam voice server online (cloud GPU) · ${st.gpu}`
-        : `Voice server online${st.mode === 'cloud' ? ' (cloud GPU)' : st.mode === 'local' ? ' (laptop GPU)' : ''} · ${st.gpu}`)
-      : (lang === 'ml' ? 'Malayalam server is off. Press Start server.'
-        : 'Voice server offline. Start Voicebox (or the Kaggle notebook) and press Refresh.');
+  const statusText = status === null ? 'Checking voice server…'
+    : status.ok ? `Voice server online (Kaggle cloud GPU) · ${status.gpu}`
+    : 'Voice server is off. Press Start server.';
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Mic className="w-5 h-5 text-[#1E3A8A]" /> Text to my voice</h2>
-          <p className="text-xs text-slate-500">Type text, get it spoken in your own cloned voice (private cloud GPU).</p>
+          <p className="text-xs text-slate-500">Type Malayalam or English, get it spoken in your own voice (private Kaggle cloud GPU).</p>
         </div>
         <button onClick={refresh} className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50">
           <RefreshCw className="w-3.5 h-3.5" /> Refresh
@@ -99,35 +76,25 @@ export const VoiceModule: React.FC = () => {
         ))}
       </div>
 
-      <div className={`text-xs rounded-lg px-3 py-2 flex items-center gap-2 ${st?.ok ? 'bg-blue-50 text-[#1E3A8A]' : 'bg-amber-50 text-amber-800'}`}>
-        {lang === 'ml' || st?.mode === 'cloud' ? <Cloud className="w-3.5 h-3.5" /> : <Laptop className="w-3.5 h-3.5" />}
+      <div className={`text-xs rounded-lg px-3 py-2 flex items-center gap-2 ${status?.ok ? 'bg-blue-50 text-[#1E3A8A]' : 'bg-amber-50 text-amber-800'}`}>
+        <Cloud className="w-3.5 h-3.5" />
         <span className="flex-1">{statusText}</span>
-        {lang === 'ml' && st && !st.ok && (
-          <button onClick={startMl} disabled={starting}
+        {status && !status.ok && (
+          <button onClick={startServer} disabled={starting}
             className="shrink-0 text-xs px-3 py-1 rounded-md bg-[#1E3A8A] text-white disabled:opacity-50">
             {starting ? 'Starting…' : 'Start server'}
           </button>
         )}
       </div>
-      {startMsg && lang === 'ml' && <p className="text-xs text-slate-600">{startMsg}</p>}
+      {startMsg && <p className="text-xs text-slate-600">{startMsg}</p>}
 
       <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
-        {lang === 'en' && (<>
-          <label className="block text-xs font-semibold text-slate-600">Voice</label>
-          <select value={profileId} onChange={(e) => setProfileId(e.target.value)}
-            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white">
-            {profiles.length === 0 && <option value="">Your voice is not set up yet — record it in Voicebox: Create Voice → Clone from audio</option>}
-            {profiles.map((p) => (
-              <option key={p.id} value={p.id}>{p.name} (my voice)</option>
-            ))}
-          </select>
-        </>)}
         <label className="block text-xs font-semibold text-slate-600">Text</label>
         <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5}
-          placeholder={lang === 'ml' ? 'മലയാളത്തിൽ ടൈപ്പ് ചെയ്യുക… (write English words in Malayalam letters for best sound)' : 'Type what you want your voice to say…'}
+          placeholder={lang === 'ml' ? 'മലയാളത്തിൽ ടൈപ്പ് ചെയ്യുക… (write English words in Malayalam letters for best sound)' : 'Type what you want your voice to say in English…'}
           className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 outline-none select-text resize-y" />
         <div className="flex items-center justify-between">
-          <span className="text-[11px] text-slate-400">{text.length} characters{lang === 'ml' ? ' · about 30–60 s to generate' : ''}</span>
+          <span className="text-[11px] text-slate-400">{text.length} characters · about 30–60 s to generate</span>
           <button onClick={speak} disabled={!canSpeak}
             className="flex items-center gap-2 text-sm px-4 py-2 rounded-lg bg-[#1E3A8A] text-white disabled:opacity-50">
             <Play className="w-4 h-4" /> {busy ? 'Generating…' : 'Generate voice'}
