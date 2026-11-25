@@ -58,6 +58,18 @@ Ask me any academic or SMM question in **English or Malayalam (മലയാള�
   ]);
 
   const [inputValue, setInputValue] = useState<string>('');
+  // Local Claude agent (desktop app only) - API key is stored encrypted by the main process
+  const [hasKey, setHasKey] = useState<boolean>(true);
+  const [keyInput, setKeyInput] = useState<string>('');
+  useEffect(() => {
+    window.electronAPI?.agentHasKey().then(setHasKey);
+  }, []);
+  const saveKey = async () => {
+    if (!window.electronAPI || !keyInput.trim()) return;
+    await window.electronAPI.agentSetKey(keyInput.trim());
+    setKeyInput('');
+    setHasKey(await window.electronAPI.agentHasKey());
+  };
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -268,7 +280,12 @@ ${todayList || '• All today tasks are completed!'}
     try {
       // Check if server endpoint is available, otherwise use local high-depth engine
       let replyText = '';
-      try {
+      if (window.electronAPI) {
+        // Desktop: local Claude agent with task/calendar/notes tools
+        const res = await window.electronAPI.agentChat(text, workspaceMode);
+        replyText = res.text;
+        if (res.model === 'none') setHasKey(false);
+      } else try {
         const response = await fetch('/api/copilot', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -466,6 +483,22 @@ ${todayList || '• All today tasks are completed!'}
 
       {/* Input Bar */}
       <div className="p-3 bg-white border-t border-slate-200 shrink-0">
+        {window.electronAPI && !hasKey && (
+          <form
+            onSubmit={(e) => { e.preventDefault(); saveKey(); }}
+            className="mb-2 flex items-center gap-2"
+          >
+            <input
+              type="password"
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value)}
+              placeholder="Paste Claude API key (stored encrypted on this laptop)"
+              className="flex-1 text-xs border border-slate-200 rounded-lg px-2 py-2 outline-none select-text"
+              autoComplete="off"
+            />
+            <button type="submit" className="text-xs px-3 py-2 rounded-lg bg-[#1E3A8A] text-white">Save key</button>
+          </form>
+        )}
         <form
           onSubmit={(e) => {
             e.preventDefault();

@@ -124,6 +124,13 @@ export interface InstagramReelItem {
   status: 'draft' | 'scripted' | 'recorded' | 'edited' | 'scheduled';
 }
 
+export interface Note {
+  id: string;
+  title: string;
+  body: string;
+  updatedAt: string;
+}
+
 export interface CopilotChatMessage {
   id: string;
   role: 'user' | 'assistant';
